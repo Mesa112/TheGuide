@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import os
 import openai
 from sklearn.preprocessing import LabelEncoder
-import requests  # Add this at the top with other imports
+import requests 
 from io import BytesIO
 import gdown
 
@@ -195,7 +195,7 @@ def download_file_from_google_drive(file_id):
 @st.cache_data
 def load_datasets():
     """Load the dataset from Google Drive."""
-    dataset_file_id = "1emG-BQ3-x4xsMAGMEznkh1ACdlAj5Dn1"
+    dataset_file_id = "17dj7yW22YsIfp-tvXQFCitKmLFw5IuAv"
     
     try:
         with st.spinner('Loading dataset...'):
@@ -213,7 +213,7 @@ def load_datasets():
 @st.cache_resource
 def load_model_and_encodings():
     """Load model from Google Drive and create encodings."""
-    model_file_id = "1wKixkdW2pVKEpJW-N1QIyKUr2nYirU7I"
+    model_file_id = "1ynnVEH7rmAjfe-jH8GOEmTJc6ml8dTi_"
     
     try:
         # Show loading message
@@ -411,41 +411,72 @@ def style_metric_container(label, value):
         </div>
     """, unsafe_allow_html=True)
 
-# --- OpenAI GPT-3 Assistant ---
-def generate_gpt_response(prompt):
-    # Ensure the API key is set securely
-    # You can use Streamlit's secrets management or environment variables
-    openai.api_key = "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"
+def search_dataset(dataset, make, model=None):
+    """
+    Search the dataset for the specified make and model. If no model is provided,
+    search by make only. Return relevant information if found.
+    """
+    # Filter by make and model
+    query = dataset[dataset['Make'].str.lower() == make.lower()]
+    if model:
+        query = query[query['Model'].str.lower() == model.lower()]
+    
+    if not query.empty:
+        # If matching rows exist, return a formatted response
+        results = query[['Year', 'Make', 'Model', 'Price']].head(5)  # Adjust columns as needed
+        return results
+    else:
+        # No relevant data found in the dataset
+        return None
 
-    # Define the system message and messages list
+# --- Updated GPT Functionality ---
+def generate_gpt_response(prompt, dataset):
+    """
+    First look up the dataset for relevant information. If no matches are found,
+    generate a GPT response.
+    """
+    # Extract make and model from the prompt (simplified NLP parsing)
+    prompt_lower = prompt.lower()
+    make = None
+    model = None
+    
+    # Example: Parse make and model from user query
+    for word in prompt_lower.split():
+        if word in dataset['Make'].str.lower().unique():
+            make = word
+        elif word in dataset['Model'].str.lower().unique():
+            model = word
+    
+    # If we find relevant data, use it to respond
+    if make:
+        dataset_response = search_dataset(dataset, make, model)
+        if dataset_response is not None:
+            st.write("### Dataset Match Found")
+            st.dataframe(dataset_response)  # Show results to the user
+            return f"I found some information in our dataset about {make.title()} {model.title() if model else ''}. Please see the details above."
+    
+    # If no match is found, fall back to GPT response
+    openai.api_key = "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"  
     system_message = {
         "role": "system",
         "content": (
-            "You are a helpful car shopping assistant. "
-            "Provide car recommendations based on user queries. "
-            "Include car makes, models, years, and approximate prices. "
-            "Be friendly and informative."
+            "You are a helpful car shopping assistant. Provide car recommendations or pricing estimates. "
+            "If the dataset lacks information, generate an appropriate response."
         )
     }
-
     messages = [system_message, {"role": "user", "content": prompt}]
-
-    # Call the OpenAI ChatCompletion API
+    
     response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",  # or "gpt-4" if you have access
+        model="gpt-3.5-turbo", 
         messages=messages,
         max_tokens=500,
-        n=1,
-        stop=None,
         temperature=0.7,
     )
+    
+    return response['choices'][0]['message']['content']
 
-    # Extract the assistant's reply
-    assistant_reply = response['choices'][0]['message']['content'].strip()
-
-    return assistant_reply
-
-def create_assistant_section():
+# --- Assistant Section ---
+def create_assistant_section(dataset):
     st.markdown("""
         <div style='background-color: #f8f9fa; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;'>
             <h2 style='color: #1E1E1E; margin-top: 0;'>🤖 Car Shopping Assistant</h2>
@@ -456,13 +487,12 @@ def create_assistant_section():
     if "assistant_responses" not in st.session_state:
         st.session_state.assistant_responses = []
 
-    prompt = st.text_input("Ask about car recommendations...", 
+    prompt = st.text_input("Ask about car recommendations or pricing...", 
                            placeholder="Type your question here...")
 
     if prompt:
         try:
-            # Use OpenAI API to generate response
-            response = generate_gpt_response(prompt)
+            response = generate_gpt_response(prompt, dataset)
             st.session_state.assistant_responses.append(response)
         except Exception as e:
             response = f"Sorry, I encountered an error: {str(e)}"
@@ -481,7 +511,6 @@ def create_assistant_section():
     if st.button("Clear Chat"):
         st.session_state.assistant_responses = []
         st.experimental_rerun()
-
 # --- Prediction Interface ---
 def create_prediction_interface():
     with st.sidebar:
@@ -633,7 +662,7 @@ def predict_with_ranges(inputs, model, label_encoders):
         'max_price': max_price
     }
 # --- Main Application ---
-def main(model, label_encoders):
+def main(model, label_encoders, dataset):
     col1, col2 = st.columns([2, 1])
 
     with col1:
@@ -646,46 +675,25 @@ def main(model, label_encoders):
         
         inputs, predict_button = create_prediction_interface()
         
-        # Prepare base inputs
-        base_inputs = {
-            "year": inputs.get("year", 2022),
-            "make": inputs.get("make", "toyota").lower(),
-            "model": inputs.get("model", "camry"),
-            "odometer": inputs.get("odometer", 20000),
-            "condition": inputs.get("condition", "good"),
-            "fuel": inputs.get("fuel", "gas"),
-            "title_status": inputs.get("title_status", "clean"),
-            "transmission": inputs.get("transmission", "automatic"),
-            "drive": inputs.get("drive", "fwd"),
-            "size": inputs.get("size", "mid-size"),
-            "paint_color": inputs.get("paint_color", "black"),
-            "type": inputs.get("type", "sedan")
-        }
-
-        if base_inputs["condition"] == "new":
-            base_inputs["odometer"] = 0
-
         if predict_button:
-            st.write(f"Analyzing {base_inputs['year']} {base_inputs['make'].title()} {base_inputs['model'].title()}...")
-            prediction_results = predict_with_ranges(base_inputs, model, label_encoders)
+            st.write(f"Analyzing {inputs['year']} {inputs['make'].title()} {inputs['model'].title()}...")
+            prediction_results = predict_with_ranges(inputs, model, label_encoders)
             
             st.markdown(f"""
                 ### Price Analysis
                 - **Estimated Range**: ${prediction_results['min_price']:,.2f} - ${prediction_results['max_price']:,.2f}
                 - **Model Prediction**: ${prediction_results['predicted_price']:,.2f}
-                
-                *Note: Range based on market data, condition, and mileage*
             """)
 
         # Generate and display the graph
-        fig = create_market_trends_plot_with_model(model, base_inputs["make"], base_inputs, label_encoders)
+        fig = create_market_trends_plot_with_model(model, inputs["make"], inputs, label_encoders)
         if fig:
             st.pyplot(fig)
         else:
             st.warning("No graph generated. Please check your data or selection.")
 
     with col2:
-        create_assistant_section()
+        create_assistant_section(dataset)
 
 if __name__ == "__main__":
     try:
@@ -693,11 +701,8 @@ if __name__ == "__main__":
         original_data = load_datasets()
         model, label_encoders = load_model_and_encodings()
         
-        # Inspect model features
-        inspect_model_features(model)
-        
         # Call the main function
-        main(model, label_encoders)
+        main(model, label_encoders, original_data)
     except Exception as e:
         st.error(f"Error loading data or models: {str(e)}")
         st.stop()
