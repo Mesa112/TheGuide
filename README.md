@@ -2,6 +2,9 @@
 
 An advanced machine learning application that helps users find the perfect car within their budget using Random Forest regression and real-time market analysis. The system provides price predictions and personalized recommendations through an interactive web interface.
 
+## 🔗 Live Demo
+Try the application live: [The Guide on Hugging Face](https://huggingface.co/spaces/Cipher29/TheGuide)
+
 ## Features
 
 ### 🤖 Machine Learning Core
@@ -29,7 +32,7 @@ An advanced machine learning application that helps users find the perfect car w
 - **Data Processing**: Pandas, NumPy
 - **Visualization**: Matplotlib
 - **AI Integration**: OpenAI GPT-3.5
-
+  
 ## Installation
 
 1. Clone the repository:
@@ -50,12 +53,17 @@ export OPENAI_API_KEY='your-api-key'
 
 ## Usage
 
-1. Start the Streamlit application:
-```bash
-streamlit run app.py
-```
+1. **Access the Live Application**:
+   - Visit [https://huggingface.co/spaces/Cipher29/TheGuide](https://huggingface.co/spaces/Cipher29/TheGuide)
+   - No installation required for the web version
 
-2. Access the web interface at `http://localhost:8501`
+2. **Local Installation** (if you want to run it locally):
+   ```bash
+   git clone https://github.com/Mesa112/TheGuide.git
+   cd TheGuide
+   pip install -r requirements.txt
+   streamlit run app.py
+   ```
 
 3. Enter vehicle details:
    - Select make and model
